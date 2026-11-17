@@ -49,7 +49,10 @@ bool decode_destination(const uint8_t *p, size_t n, Eta *out)
     e.metres = be_double(p + s + len + 4);
     if (!std::isfinite(e.metres) || e.metres < 0 || e.metres > 1e8)
         return false;
-    e.route = e.left_s > 0 || e.metres > 0;
+    /* Without a route the field still comes, its distance text empty and
+     * its numbers left over (VERIFIED on the car: "0 min · 0 m" shown):
+     * a route needs the phone's distance text and something left. */
+    e.route = !e.distance.empty() && (e.left_s >= 30 || e.metres >= 1);
     *out = e;
     return true;
 }

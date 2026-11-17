@@ -69,6 +69,20 @@ int main()
     expect(decode_destination(hex(kNoRoute), &none) && !none.route, "no route decodes as none");
     expect(eta_text(none, now, false).empty(), "no text without a route");
 
+    /* no route, numbers left over but no distance text: none */
+    std::vector<uint8_t> left_over = hex(kNoRoute);
+    left_over[11] = 12;   /* 12 s */
+    Eta stale;
+    expect(decode_destination(left_over, &stale) && !stale.route && eta_text(stale, now, false).empty(),
+           "no distance text: no route, whatever numbers are left");
+    /* the phone's text but nothing left (arrived): none */
+    std::vector<uint8_t> arrived = p;
+    arrived[11] = 0;
+    for (int i = 41; i < 49; i++)
+        arrived[i] = 0;
+    Eta at;
+    expect(decode_destination(arrived, &at) && !at.route, "nothing left: arrived, no route");
+
     Eta km = e;
     km.unit = 1;
     km.metres = 12345;

@@ -30,9 +30,12 @@
  *           +  f64  distance left, metres        (965)
  *           ...     the rest, not used
  *
- * INFERRED: the other unit values (kilometres, metres, feet, yards), how a
- * route over an hour looks, and that the field goes back to zeros when the
- * route ends. A unit other than miles shows the metres as km or m. */
+ * Without a route the field still comes, with an empty distance text and
+ * numbers left over (VERIFIED on the car): a route needs the text and some
+ * time or distance left. Waze sends the car no route guidance, so with
+ * Waze there is none (cluster-render.conf, guide hold). INFERRED: the
+ * other unit values (kilometres, metres, feet, yards) and how a route over
+ * an hour looks. A unit other than miles shows the metres as km or m. */
 #ifndef WOC_ETA_H
 #define WOC_ETA_H
 
