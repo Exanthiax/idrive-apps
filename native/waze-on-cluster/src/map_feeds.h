@@ -94,6 +94,10 @@ public:
     /* The HUD's feed while there is one, else null. */
     MapFeed *hud_feed() { return hud_.get(); }
 
+    /* The picture over the top of the cluster's map (MapFeed::set_badge),
+     * kept for a cluster feed made later. */
+    void set_badge(const std::vector<uint8_t> &rgba, unsigned w, unsigned h, int y);
+
 private:
     /* The HUD's feed made or dropped to match the setting and the target. */
     void follow();
@@ -108,6 +112,9 @@ private:
     uint64_t id_ = 0;   /* the newest frame's */
     bool live_ = false, frozen_ = false;
     Picture picture_ = Picture::None;
+    std::vector<uint8_t> badge_;   /* set_badge's */
+    unsigned badge_w_ = 0, badge_h_ = 0;
+    int badge_y_ = 0;
 };
 
 }  // namespace woc

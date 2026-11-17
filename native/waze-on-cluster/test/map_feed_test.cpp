@@ -961,10 +961,52 @@ static void renderer_changed()
     }
 }
 
+/* The badge (the arrival time, eta_strip.h): an overlay image layer centred
+ * at the top of the map, shown while the map is, hidden with it, gone when
+ * cleared. */
+static const crs::Layer *badge_layer(Rig &r)
+{
+    for (const crs::Layer *l : r.svc->compositor().layers())
+        if (std::string(l->kind()) == "image")
+            return l;
+    return nullptr;
+}
+
+static void badge()
+{
+    const std::vector<uint8_t> f = atlas(3);
+    Rig r;
+    r.pump(1500, &f);
+    std::vector<uint8_t> px(520 * 52 * 4, 0);
+    px[3] = 255;
+    r.feed->set_badge(px, 520, 52, 12);
+    r.pump(200, &f);
+    const crs::Layer *b = badge_layer(r);
+    ok("badge: an overlay image layer on the map, 520x52 centred 12 px below the top, shown with the map",
+       b && b->target() == 0 && b->params.klass == crs::Klass::Overlay && b->params.rect.x == 284 &&
+           b->params.rect.y == 12 && b->params.rect.w == 520 && b->params.rect.h == 52 && b->params.visible &&
+           !b->params.contend && r.st().state == "showing");
+    r.feed->set_stream(false, false, Picture::Shown);
+    r.pump(100);
+    b = badge_layer(r);
+    ok("badge: hidden while the map is", b && !b->params.visible);
+    r.feed->set_stream(true, false, Picture::Shown);
+    r.pump(300, &f);
+    b = badge_layer(r);
+    ok("badge: back with the map", b && b->params.visible);
+    r.feed->set_badge(std::vector<uint8_t>(), 0, 0, 0);
+    r.pump(100, &f);
+    ok("badge: cleared, its layer gone, the map still showing", !badge_layer(r) && r.st().state == "showing");
+    r.feed->set_badge(std::vector<uint8_t>(10, 0), 520, 52, 12);
+    r.pump(100, &f);
+    ok("badge: a picture of the wrong size is ignored", !badge_layer(r));
+}
+
 int main()
 {
     signal(SIGPIPE, SIG_IGN);
     setvbuf(stdout, nullptr, _IONBF, 0);
+    badge();
     hosting();
     vpp_hosting();
     always_packed_map();

@@ -55,6 +55,7 @@ void MapFeeds::follow()
         if (cluster_on_) {
             cluster_.reset(new MapFeed(base_));
             cluster_->set_stream(live_, frozen_, picture_);
+            cluster_->set_badge(badge_, badge_w_, badge_h_, badge_y_);
             if (hud_ && hud_->latest(&copy_))
                 cluster_->hold(&copy_, id_);
         } else {
@@ -123,6 +124,16 @@ void MapFeeds::set_hud_keep_shown(bool keep)
     base_.hud_keep_shown = keep;
     if (hud_)
         hud_->set_hud_keep_shown(keep);
+}
+
+void MapFeeds::set_badge(const std::vector<uint8_t> &rgba, unsigned w, unsigned h, int y)
+{
+    badge_ = rgba;
+    badge_w_ = w;
+    badge_h_ = h;
+    badge_y_ = y;
+    if (cluster_)
+        cluster_->set_badge(rgba, w, h, y);
 }
 
 void MapFeeds::set_guide_hold(bool hold)

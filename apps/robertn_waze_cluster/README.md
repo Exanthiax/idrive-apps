@@ -6,6 +6,8 @@ iDrive 7. It can also show it on the head-up display (experimental).
 - **CarPlay:** Waze, Apple Maps or Google Maps. During a route, Apple Maps
   and Google Maps also show their arrival-time card on the cluster.
 - **Android Auto:** Google Maps.
+- **Arrival time:** during a route, your arrival time, the time left and
+  the distance left show in a pill at the top of the cluster map.
 
 Whether your car and its software are supported can differ for CarPlay and
 Android Auto. The app's **Status** for each tells you.

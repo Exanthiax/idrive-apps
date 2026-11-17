@@ -2,6 +2,9 @@
 
 ## Unreleased
 
+During a route, your arrival time, the time left and the distance left show
+in a pill at the top of the cluster map, as on your phone.
+
 ## 0.6.12
 
 The cluster's safe area is back to 504x368 at (286, 72); a smaller area made

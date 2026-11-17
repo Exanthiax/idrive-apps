@@ -39,6 +39,9 @@
 #include "alt_screen.h"
 #include "config.h"
 #include "control.h"
+#include "eta.h"
+#include "eta_source.h"
+#include "eta_strip.h"
 #include "guide_setting.h"
 #include "head_unit.h"
 #include "local_conf.h"
@@ -233,7 +236,9 @@ int serve(Config cfg)
         {"freeze_ms", 0, 600000},   {"freeze_min_fps", 1, 60},       {"alt_screen_port", 0, 65535},
         {"idle_ms", 1000, 600000},  {"blank_ms", 1000, 600000},
         {"alt_screen_uid", 0, 4294967294L}, {"gpu_copy", 0, 1},   {"hosted_vpp_scale", 0, 1},
-        {"always_packed", 0, 1}};
+        {"always_packed", 0, 1},
+        {"eta_strip", 0, 1},        {"eta_clock_12h", 0, 1},         {"eta_strip_y", 0, 400},
+        {"eta_font_px", 12, 48}};
     for (const Range &r : ranges)
         if (cfg.num(r.key) < r.lo || cfg.num(r.key) > r.hi) {
             log_error("%s must be from %ld to %ld", r.key, r.lo, r.hi);
@@ -318,6 +323,27 @@ int serve(Config cfg)
         return 1;
     }
 
+    /* The arrival time over the top of the map (eta.h, eta_strip.h): the
+     * font first, so a unit without it never subscribes. */
+    EtaStrip strip;
+    EtaSource eta_source;
+    bool eta_on = false;
+    if (cfg.num("eta_strip") == 1) {
+        std::string why;
+        if (!strip.load(cfg.str("eta_freetype_lib"), cfg.str("eta_font"), (unsigned)cfg.num("eta_font_px"), &why) ||
+            !eta_source.start(cfg.str("eta_vsomeip_lib"), &why))
+            log_warn("eta: no arrival time on the map: %s", why.c_str());
+        else
+            eta_on = true;
+    }
+    const bool eta_clock12 = cfg.num("eta_clock_12h") == 1;
+    const int eta_y = (int)cfg.num("eta_strip_y");
+    Eta eta;
+    std::vector<uint8_t> eta_payload, eta_rgba;
+    std::string eta_shown;
+    bool eta_bad_logged = false;
+    int64_t eta_drawn_ms = -1000;
+
     std::vector<uint8_t> frame;
     StatusLog status_log;
     int64_t last_status_write = 0;
@@ -370,6 +396,33 @@ int serve(Config cfg)
         producer.set_live(live, now);
         producer.set_pictures(feed.wants_frames());
         feed.set_stream(live, producer.frozen(now), producer.picture(now));
+        if (eta_on) {
+            bool fresh = false;
+            if (eta_source.take(&eta_payload)) {
+                Eta e;
+                if (decode_destination(eta_payload, &e)) {
+                    if (e.route != eta.route)
+                        log_info("eta: %s", e.route ? "a route is guided" : "no route");
+                    eta = e;
+                    fresh = true;
+                } else if (!eta_bad_logged) {
+                    log_warn("eta: a destination of %zu bytes does not decode; the last one stays", eta_payload.size());
+                    eta_bad_logged = true;
+                }
+            }
+            /* the arrival moves on with the clock: the text once a second */
+            if (fresh || now - eta_drawn_ms >= 1000) {
+                eta_drawn_ms = now;
+                const std::string text = eta_text(eta, time(nullptr), eta_clock12);
+                if (text != eta_shown && strip.draw(text, &eta_rgba)) {
+                    eta_shown = text;
+                    if (text.empty())
+                        feed.set_badge(std::vector<uint8_t>(), 0, 0, 0);
+                    else
+                        feed.set_badge(eta_rgba, EtaStrip::kWidth, EtaStrip::kHeight, eta_y);
+                }
+            }
+        }
         feed.poll(now);
         if (fc.vpp_scale)
             producer.set_part(feed.part());
@@ -559,6 +612,13 @@ void define_keys(Config *cfg)
     cfg->define("hud_scale_down", "1");
     cfg->define("hud_round_corners", "1");
     cfg->define("hud_black_background", "1");
+    cfg->define("eta_strip", "1");
+    cfg->define("eta_clock_12h", "0");
+    cfg->define("eta_strip_y", "12");
+    cfg->define("eta_font", "/mnt/dataro/dataro2/hmi/common/font/BMWTARG.ttf");
+    cfg->define("eta_font_px", "30");
+    cfg->define("eta_vsomeip_lib", "libvsomeip3.so.3");
+    cfg->define("eta_freetype_lib", "libfreetype.so.6");
     cfg->define("render_socket", "/dev/shm/cluster-render/render.sock");
     cfg->define("log_file", "/var/opt/waze-on-cluster/log/waze-on-cluster.log");
     cfg->define("log_file_kb", "512");

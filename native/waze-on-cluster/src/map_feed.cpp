@@ -370,7 +370,60 @@ void MapFeed::poll(int64_t now_ms)
         down_long_ = false;
     }
     show_when_sent();
+    sync_badge();
     count_second(now_ms);
+}
+
+void MapFeed::set_badge(const std::vector<uint8_t> &rgba, unsigned w, unsigned h, int y)
+{
+    if (!rgba.empty() && rgba.size() != (size_t)w * h * 4)
+        return;
+    if (rgba == badge_px_ && w == badge_w_ && h == badge_h_ && y == badge_y_)
+        return;
+    badge_px_ = rgba;
+    badge_w_ = w;
+    badge_h_ = h;
+    badge_y_ = y;
+    badge_dirty_ = true;
+    sync_badge();
+}
+
+void MapFeed::sync_badge()
+{
+    const bool want = layer_ && !hosted() && cfg_.target != "hud" && !badge_px_.empty() && client_.connected();
+    cr::LayerOptions lo;
+    if (want) {
+        lo.target = lo_.target;
+        lo.klass = "overlay";
+        lo.guide_hold = lo_.guide_hold;
+        lo.yield = lo_.yield;
+        lo.x = lo_.x + ((int)lo_.w - (int)badge_w_) / 2;
+        lo.y = lo_.y + badge_y_;
+        lo.w = badge_w_;
+        lo.h = badge_h_;
+        lo.visible = lo_.visible;
+    }
+    /* gone, or on another target or of another size: made again */
+    if (badge_layer_ && (!want || lo.target != badge_lo_.target || lo.w != badge_lo_.w || lo.h != badge_lo_.h)) {
+        client_.drop(badge_layer_);
+        badge_layer_ = 0;
+    }
+    if (!want)
+        return;
+    if (!badge_layer_) {
+        cr::ImageOptions io;
+        io.w = badge_w_;
+        io.h = badge_h_;
+        badge_layer_ = client_.image(lo, io);
+        badge_lo_ = lo;
+        badge_dirty_ = true;
+    } else if (lo.x != badge_lo_.x || lo.y != badge_lo_.y || lo.visible != badge_lo_.visible ||
+               lo.guide_hold != badge_lo_.guide_hold || lo.yield != badge_lo_.yield) {
+        client_.set(badge_layer_, lo);
+        badge_lo_ = lo;
+    }
+    if (badge_dirty_ && client_.pixels(badge_layer_, {}, badge_px_.data(), badge_px_.size()))
+        badge_dirty_ = false;
 }
 
 void MapFeed::count_second(int64_t now_ms)
@@ -551,6 +604,7 @@ void MapFeed::set_stream(bool live, bool frozen, Picture picture)
         lo_.visible = false;
         client_.set(layer_, lo_);
     }
+    sync_badge();
 }
 
 void MapFeed::request_report()

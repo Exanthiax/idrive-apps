@@ -232,6 +232,12 @@ public:
      * frozen and shows a picture. */
     void set_stream(bool live, bool frozen, Picture picture);
 
+    /* A picture over the top of the map (eta_strip.h): rgba, w x h, straight
+     * alpha, centred on the map area, y pixels below its top; empty rgba:
+     * none. An image layer of class overlay, shown while the map layer is,
+     * on the feed's own target only: not on the HUD, nor while hosted. */
+    void set_badge(const std::vector<uint8_t> &rgba, unsigned w, unsigned h, int y);
+
     /* The status for the app, with decode the capture and decode part of
      * the line and stream why the picture is not whole (empty: it is). */
     FeedStatus status(const std::string &decode, const std::string &stream = std::string()) const;
@@ -263,6 +269,9 @@ private:
     void send_newest();
     /* Makes the layer visible once the newest frame has gone. */
     void show_when_sent();
+    /* The badge's layer made, moved, shown, hidden, redrawn or dropped to
+     * follow the map layer (set_badge). */
+    void sync_badge();
 
     FeedConfig cfg_;
     cr::Client client_;
@@ -303,6 +312,12 @@ private:
      * held_new_ (else the layer's last), never a whole picture. */
     OutputPart held_part_;
     const char *unpacked_why_ = nullptr;   /* why always_packed did not apply, as last logged */
+    std::vector<uint8_t> badge_px_;        /* set_badge's picture; empty: none */
+    unsigned badge_w_ = 0, badge_h_ = 0;
+    int badge_y_ = 0;
+    bool badge_dirty_ = false;             /* its pixels have not gone to its layer */
+    uint32_t badge_layer_ = 0;
+    cr::LayerOptions badge_lo_;            /* the badge layer's options as last sent */
 };
 
 }  // namespace woc

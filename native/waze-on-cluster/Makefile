@@ -42,7 +42,7 @@ IMAGE   := cluster-render-build:$(shell cksum < $(CR)/docker/Dockerfile | cut -d
 DOCKER_IMAGE = docker image inspect $(IMAGE) >/dev/null 2>&1 || \
 	docker build -q --platform linux/amd64 -t $(IMAGE) $(CR)/docker
 CXXFLAGS = -std=c++14 -O2 -g -Wall -Wextra -Werror
-CPPFLAGS = -I. -Isrc -I$(KIT) -I$(CR)/include -Iabi/include -I$(CR)/src
+CPPFLAGS = -I. -Isrc -I$(KIT) -I$(CR)/include -Iabi/include -I$(CR)/src -isystem $(CR)/dcsm/third_party/vsomeip/interface
 
 T = $(BUILD)/target
 
@@ -52,7 +52,7 @@ VERSION := $(shell sed -n 's/^ *"version": *"\([^"]*\)".*/\1/p' component.json)
 # The capture, decode and map feed (own files), the kit's atlas, packing and
 # geometry, and the shared renderer's client.
 WOC_SRC = src/main.cpp src/refused.cpp src/video_producer.cpp src/freeze_watch.cpp src/alt_screen.cpp src/map_feed.cpp src/map_feeds.cpp src/atlas_scale.cpp src/control.cpp src/h264_source.cpp \
-          src/guide_setting.cpp src/map_state.cpp src/local_conf.cpp \
+          src/guide_setting.cpp src/map_state.cpp src/local_conf.cpp src/eta.cpp src/eta_source.cpp src/eta_strip.cpp \
           src/udp_source.cpp src/avb_source.cpp src/framing_probe.cpp src/rtp_h264.cpp src/sps_info.cpp \
           src/decoder_msdk.cpp src/nal_reader.cpp src/stream_health.cpp $(KIT)/map_geometry.cpp $(KIT)/yuv_atlas.cpp \
           $(KIT)/block_pack.cpp
@@ -67,7 +67,7 @@ CPP_TESTS = $(BUILD)/host/nal_reader_test $(BUILD)/host/rtp_h264_test $(BUILD)/h
 		$(BUILD)/host/stream_health_test $(BUILD)/host/source_crop_test \
 		$(BUILD)/host/map_rect_test $(BUILD)/host/guide_setting_test $(BUILD)/host/decoder_test \
 		$(BUILD)/host/map_state_test $(BUILD)/host/local_conf_test $(BUILD)/host/atlas_scale_test $(BUILD)/host/sps_info_test \
-		$(BUILD)/host/picture_pace_test
+		$(BUILD)/host/picture_pace_test $(BUILD)/host/eta_test
 # The control socket (accept4) and the producer (pipe2) are Linux's: built and run on Linux only
 # (make test-x86).
 LINUX_TESTS = $(if $(filter Linux,$(shell uname -s)),$(BUILD)/host/refused_test $(BUILD)/host/video_producer_test)
@@ -134,6 +134,7 @@ test-cpp: $(CPP_TESTS)
 	$(BUILD)/host/local_conf_test
 	$(BUILD)/host/atlas_scale_test
 	$(BUILD)/host/sps_info_test
+	$(BUILD)/host/eta_test
 	$(if $(LINUX_TESTS),$(foreach t,$(LINUX_TESTS),$(t) &&) true,@echo 'refused_test, video_producer_test: Linux only (make test-x86)')
 	$(MAKE) -C $(CR) test-kit BUILD=$(abspath $(BUILD))/kit
 
@@ -307,13 +308,17 @@ $(T)/obj/%.o: %.cpp component.json
 -include $(wildcard $(T)/obj/*/*.d $(T)/obj/cr/*/*.d)
 
 $(T)/waze-on-cluster: $(call objs,$(SRC),$(T)/obj) $(STUBS)
-	g++ $(WOC_FLAGS) -Wl,--dynamic-linker=/lib/ld-linux-x86-64.so.2 -o $@ $^
+	g++ $(WOC_FLAGS) -Wl,--dynamic-linker=/lib/ld-linux-x86-64.so.2 -o $@ $^ -ldl
 	$(PYTHON) $(CR)/dcsm/tools/abi.py check $@ $(CR)/dcsm/abi/libvsomeip3.so.3.symbols   # loader, glibc/libstdc++ limits
 	$(PYTHON) tools/woc_abi.py check-imports $@ --prefix MFX va ias_ -- \
 		abi/libmfx.symbols abi/libva.symbols abi/libva-drm.symbols abi/libias_avb.symbols
 
 clean:
 	rm -rf $(BUILD)
+
+$(BUILD)/host/eta_test: test/eta_test.cpp src/eta.cpp src/eta.h src/eta_strip.cpp src/eta_strip.h
+	mkdir -p $(@D)
+	$(CXX) $(CXXFLAGS) -Isrc -o $@ test/eta_test.cpp src/eta.cpp src/eta_strip.cpp $(if $(filter Linux,$(shell uname -s)),-ldl)
 
 $(BUILD)/host/atlas_scale_test: test/atlas_scale_test.cpp src/atlas_scale.cpp src/atlas_scale.h $(KIT)/yuv_atlas.cpp $(KIT)/yuv_atlas.h
 	mkdir -p $(@D)

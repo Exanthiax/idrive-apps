@@ -99,6 +99,14 @@ until the phone reconnects.
 the cluster is hidden (cluster-render README, "Guide hold"). The app's
 **Hide BMW's turn box** checkbox turns that off and on at once.
 
+**Arrival time.** During a route, the arrival time, time left and distance
+left (`13:22 · 4 min · 0.6 mi`) show in a dark pill over the top of the
+cluster map, in the head unit's own BMW font, while the map shows. They come
+from the head unit's navigation Guidance service, which carries the phone's
+route guidance (`src/eta.h`); the arrival is the clock plus the time left.
+`eta_strip = 0` in `waze-on-cluster.local.conf` turns it off;
+`eta_clock_12h = 1` shows `1:22 pm`.
+
 **Where the map shows.** The app's **Show on** sets the cluster, the HUD,
 both or neither (**Off**), at once. On the HUD the frames are scaled on the
 head unit to the size shown (**Size**, 30 % to 85 % of the HUD's width, or
