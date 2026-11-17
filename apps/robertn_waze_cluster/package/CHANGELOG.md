@@ -2,6 +2,8 @@
 
 ## Unreleased
 
+## 0.6.13
+
 During a route, your arrival time, the time left and the distance left show
 in a pill at the top of the cluster map, as on your phone.
 
